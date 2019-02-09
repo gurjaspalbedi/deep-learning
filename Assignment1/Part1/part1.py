@@ -32,7 +32,7 @@ transform = transforms.Compose([
   transforms.ToTensor(),
   transforms.Normalize((0.1307,), (0.3081,))
 ])
-
+output_1000 = None
 train_set = torchvision.datasets.MNIST(
     'mnist_data',
     transform=transform,
@@ -68,85 +68,164 @@ class NeuralNet(nn.Module):
     self.hidden_layer4 = nn.Linear(1024, 1024)
     self.hidden_layer5 = nn.Linear(1024, 1024)
     self.output_layer = nn.Linear(1024, 10)
-    
     self.activation = nn.ReLU()
 
   def forward(self, data):
-
     data = data.view(-1, 28*28).cuda()
-    output = self.activation(self.input_layer(data))
-    output = self.activation(self.hidden_layer1(output))
-    output = self.activation(self.hidden_layer2(output))
-    output = self.activation(self.hidden_layer3(output))
-    output = self.activation(self.hidden_layer4(output))
-    output = self.activation(self.hidden_layer5(output))
-    final_output = self.output_layer(output)
-#     print(final_output.shape)
-    return torch.nn.functional.log_softmax(final_output, dim=1)
+    self.output_input_layer = self.activation(self.input_layer(data))
+    self.output_1st_hidden = self.activation(self.hidden_layer1(self.output_input_layer))
+    self.output_2nd_hidden = self.activation(self.hidden_layer2(self.output_1st_hidden))
+    self.output_3rd_hidden = self.activation(self.hidden_layer3(self.output_2nd_hidden))
+    self.output_4th_hidden = self.activation(self.hidden_layer4(self.output_3rd_hidden))
+    self.output_5th_hidden = self.activation(self.hidden_layer5(self.output_4th_hidden))
+    self.final_output = self.output_layer(self.output_5th_hidden)
+#    print("final output")
+#    print(final_output.shape)
+    return torch.nn.functional.log_softmax(self.final_output, dim=1)
 
 
 #%%
 neural_network = NeuralNet().cuda()
 loss_function = nn.CrossEntropyLoss()
 para = neural_network.parameters()
-optimizer = torch.optim.Adam(params=para, lr=0.01)
+optimizer = torch.optim.Adam(para, lr = 0.001)
 
-for i, data in enumerate(train_loader):
-  images, labels = data
-  optimizer.zero_grad()
-  outputs = neural_network(images.cuda())
-  loss_f = loss_function(outputs.cuda(), labels.cuda())
-  loss_f.backward()
-  optimizer.step()
+for t in range(50):
+    for i, data in enumerate(train_loader):
+      images, labels = data
+      optimizer.zero_grad()
+      outputs = neural_network(images.cuda())
+      loss_f = loss_function(outputs.cuda(), labels.cuda())
+      loss_f.backward()
+      optimizer.step()
 
 #%%
 correct  = 0
 total = 0
 save_one = 0
+
 with torch.no_grad():
   for data in test_loader:
     images, labels = data
-    images.cuda()
-    labels.cuda()
+    images = images.cuda()
+    labels = labels.cuda()
     outputs = neural_network(images)
     _, predicted = torch.max(outputs.data.cuda(), 1)
-    _.cuda()
-    predicted.cuda()
+
+    _ = _.cuda()
+    predicted = predicted.cuda()
     total += labels.size(0)
-    correct += (predicted.cuda() == labels.cuda()).sum().item()
+    correct += (predicted == labels).sum().item()
+  print(total)
 print('Accuracy of the network on the 10000 test images: %d %%' % (100 * correct / total))
 
+
+#%%
+def draw_pca_plot(x , y):
+    
+    pca = PCA(2)
+    
+    principalComponents = pca.fit_transform(x)
+    fig, plot = plt.subplots()
+    fig.set_size_inches(15, 8)
+#    plt.prism()
+    c = y
+    x_axis = principalComponents[:, 0]
+    y_axis = principalComponents[:, 1]
+#    x_mean = np.mean(x_axis)
+#    y_mean = np.mean(y_axis)
+#    plt.text(x_mean, y_mean, "1")
+    plt.scatter(x_axis , y_axis, c= c)
+    plt.show() 
+draw_pca_plot(neural_network.output_1st_hidden.cpu(), labels.cpu())           
+#%%
+#question 5 and 6
+#https://towardsdatascience.com/pca-using-python-scikit-learn-e653f8989e60
+from sklearn.decomposition import PCA
+
+# PCA for the 1000 input samples
+pca_x = train_set.train_data[: 1000]
+pca_y = train_set.train_labels[: 1000] 
+
+draw_pca_plot(pca_x.view(1000, -1), pca_y)
+
+#%%
 #%%
 #Part 3
 thousand_test_set = torch.utils.data.Subset(test_set, range(1000))
-print(thousand_test_set)
-
-thousand_test_loader = torch.utils.data.DataLoader(thousand_test_set, 1000)
+thousand_test_loader = torch.utils.data.DataLoader(thousand_test_set,batch_size=1000)
 print(len(thousand_test_loader))
-#first_iter = next(iter(thousand_test_set))
-#image , label = first_iter
-#print(image.shape)
-#plt.imshow(image.squeeze(), cmap="gray")
+#%%
+#feed forward on thousand samples
+with torch.no_grad():
+  for data in thousand_test_loader:
+    images, labels = data
+#    print(images.shape, labels)
+#    plt.imshow(images.squeeze(), cmap="gray")
+    images = images.cuda()
+    labels = labels.cuda()
+#    print(images.shape)
+#    print(labels.shape)
+    outputs = neural_network(images)
+#%%
+#%%
+# PCA for the 1000 input samples
 
 #%%
-with torch.no_grad():
-  for i, data in enumerate(thousand_test_loader):
-    images, labels = data
-#    print(images.size())
-    images.cuda()
-    labels.cuda()
-    outputs = neural_network(images)
-    
-    print(outputs.shape)
-    index = torch.argmax(outputs,dim = 1)
-    
-#    _, predicted = torch.max(outputs.data.cuda(), 1)
-#    _.cuda()
-#    predicted.cuda()
-#    total += labels.size(0)
-#    correct += (predicted.cuda() == labels.cuda()).sum().item()
-#print('Accuracy of the network on the 10000 test images: %d %%' % (100 * correct / total))
+draw_pca_plot(neural_network.output_input_layer.cpu(), labels.cpu())
 
+#%%
+draw_pca_plot(neural_network.output_1st_hidden.cpu(), labels.cpu())
+#%%
+draw_pca_plot(neural_network.output_2nd_hidden.cpu(), labels.cpu())
+
+#%%
+draw_pca_plot(neural_network.output_3rd_hidden.cpu(), labels.cpu())
+
+#%%
+draw_pca_plot(neural_network.output_4th_hidden.cpu(), labels.cpu())
+#%%
+draw_pca_plot(neural_network.output_5th_hidden.cpu(), labels.cpu())
+#%%
+draw_pca_plot(neural_network.final_output.cpu(), labels.cpu())
+#%%  
+from sklearn.manifold import TSNE
+def draw_tsne_plot(x,y):
+
+    pca = TSNE(2)
+    
+    principalComponents = pca.fit_transform(x)
+    fig, plot = plt.subplots()
+    fig.set_size_inches(10, 10)
+    plt.prism()
+    c = y
+    x_axis = principalComponents[:, 0]
+    y_axis = principalComponents[:, 1]
+    x_mean = np.mean(x_axis)
+    y_mean = np.mean(y_axis)
+    plt.scatter(x_axis , y_axis , c= c)
+    plt.text(x_mean, y_mean, 1)
+    plt.show() 
+
+#%%
+draw_tsne_plot(neural_network.output_input_layer.cpu(), labels.cpu())
+#%%
+draw_tsne_plot(neural_network.output_1st_hidden.cpu(), labels.cpu())
+#%%
+draw_tsne_plot(neural_network.output_2nd_hidden.cpu(), labels.cpu())
+
+#%%
+draw_tsne_plot(neural_network.output_3rd_hidden.cpu(), labels.cpu())
+
+#%%
+draw_tsne_plot(neural_network.output_4th_hidden.cpu(), labels.cpu())
+#%%
+draw_tsne_plot(neural_network.output_5th_hidden.cpu(), labels.cpu())
+#%%
+draw_tsne_plot(neural_network.final_output.cpu(), labels.cpu())
+
+#%%    
+    
 
 
 
