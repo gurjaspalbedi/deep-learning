@@ -24,6 +24,7 @@ import matplotlib.pyplot as plt
 import torch.nn as nn
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
+import matplotlib.cm as cm
 
 print("Torch", torch.__version__, "CUDA", torch.version.cuda)
 print("Device:", torch.device("cuda:0"))
@@ -132,16 +133,14 @@ print(
 def draw_pca_plot(x, y):
     pca = PCA(2)
     principal_components = pca.fit_transform(x)
-    fig, plot = plt.subplots()
+    fig = plt.subplots()[0]
     fig.set_size_inches(15, 8)
-    c = y
+    colors = y
     x_axis = principal_components[:, 0]
     y_axis = principal_components[:, 1]
-    plt.scatter(x_axis, y_axis, c=c)
+    plt.scatter(x_axis, y_axis, c=colors, cmap=cm.jet)
     plt.show()
 
-
-draw_pca_plot(neural_network.output_1st_hidden.cpu(), labels.cpu())
 
 
 #%%   
@@ -197,34 +196,25 @@ with torch.no_grad():
         # print_digits(neural_network.output_5th_hidden.cpu(),images)
 
 
-       
-# neural_network.
-#%%
-print(images_zero)
-data = train_set.train_data[:1000]
-print(data[592].shape)
-plt.imshow(data[188], cmap="gray")
-#%%
-#%%
 # PCA for the 1000 input samples
 
 #%%
-# draw_pca_plot(neural_network.output_input_layer.cpu(), labels.cpu())
+draw_pca_plot(neural_network.output_input_layer.cpu(), labels.cpu())
 
-# #%%
-# draw_pca_plot(neural_network.output_1st_hidden.cpu(), labels.cpu())
-# #%%
-# draw_pca_plot(neural_network.output_2nd_hidden.cpu(), labels.cpu())
+#%%
+draw_pca_plot(neural_network.output_1st_hidden.cpu(), labels.cpu())
+#%%
+draw_pca_plot(neural_network.output_2nd_hidden.cpu(), labels.cpu())
 
-# #%%
-# draw_pca_plot(neural_network.output_3rd_hidden.cpu(), labels.cpu())
+#%%
+draw_pca_plot(neural_network.output_3rd_hidden.cpu(), labels.cpu())
 
-# #%%
-# draw_pca_plot(neural_network.output_4th_hidden.cpu(), labels.cpu())
-# #%%
-# draw_pca_plot(neural_network.output_5th_hidden.cpu(), labels.cpu())
-# #%%
-# draw_pca_plot(neural_network.final_output.cpu(), labels.cpu())
+#%%
+draw_pca_plot(neural_network.output_4th_hidden.cpu(), labels.cpu())
+#%%
+draw_pca_plot(neural_network.output_5th_hidden.cpu(), labels.cpu())
+#%%
+draw_pca_plot(neural_network.final_output.cpu(), labels.cpu())
 # #%%
 
 # def draw_tsne_plot(x, y):
