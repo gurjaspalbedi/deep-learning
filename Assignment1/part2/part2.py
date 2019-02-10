@@ -9,6 +9,10 @@ import torch.nn as nn
 import librosa
 import numpy as np
 import torch
+import torch.utils.data
+import matplotlib.pyplot as plt
+# import os
+# os.chdir('g:\\Git\\Deep Learning\\Assignment1\\part2')
 
 #%%
 s, sr=librosa.load('data/train_clean_male.wav', sr=None)
@@ -40,7 +44,6 @@ class NeuralNet(nn.Module):
     self.activation = nn.ReLU()
 
   def forward(self, data):
-    print(data.shape)
     data = data.view(-1, 513).cuda()
     output = self.activation(self.input_layer(data))
     output = self.activation(self.hidden_layer1(output))
@@ -49,69 +52,68 @@ class NeuralNet(nn.Module):
     final = torch.nn.functional.relu(output_layer)
     return final
 
-
+#%%
+def get_snr(st, s_hat):
+    return 10 * np.log10((np.sum(st ** 2)) / (np.sum((st - s_hat) ** 2)))
 #%%
 neural_network = NeuralNet()
 neural_network = neural_network.cuda()
-#network_output , torch.max(target_set, 1)[1]
-# def loss_function(ypred,yactual):
-#   return torch.sum((ypred - yactual) ** 2)
 loss_function= nn.MSELoss()
 para = neural_network.parameters()
-optimizer = torch.optim.Adam(params=para, lr=0.01)
+optimizer = torch.optim.Adam(params=para, lr=0.001)
+loss_list = []
+epochs = 300
+for i in range(epochs):
+    input_iter = iter(train_loader)
+    target_iter = iter(test_loader)
+    while True:
+        try:
+            input_set = input_iter.next()
+            target_set = target_iter.next()
+            input_set = input_set.cuda()
+            target_set = target_set.cuda()
+            optimizer.zero_grad()
+            network_output  = neural_network(input_set)
+            loss = loss_function(network_output , target_set)
+            loss.backward()
+            optimizer.step()
+        except StopIteration:
+            break
+    loss_list.append(loss.data.cpu().numpy())
+print(loss.data)
+plt.plot(range(epochs), loss_list)
+plt.show()   
+#%%
+def test_audio(input_file_path, output_file_path):
+    st, sr=librosa.load(input_file_path, sr=None)
+    test = librosa.stft(st, n_fft=1024, hop_length=512)
+    test_abs = torch.tensor(np.abs(test))
+    test_abs = np.transpose(test_abs)
+    test_loader = torch.utils.data.DataLoader(test_abs, batch_size=test_abs.shape[0])
+    t_iter = iter(test_loader)
+    with torch.no_grad():
+        while True:
+            try:
+                data = t_iter.next()
+                data = data.cuda()
+                output = neural_network(data)
+            except StopIteration:
+                break 
+        # print(output.shape)
+        print("outside loop")
+        spec = (test / np.abs(test)) * output.cpu().numpy().T
+        spec_istft = librosa.istft(spec, hop_length=512)
+        librosa.output.write_wav(output_file_path, spec_istft, sr)
+        print("snr")
+        take_length = min(len(st), len(spec_istft))
+        print(get_snr(st[:take_length], spec_istft[:take_length]))
 
 #%%
-def get_hadamard_product_result(x_test, x_test_abs, s_hat_test):
-    div = x_test / x_test_abs
-    return torch.tensor(div) * s_hat_test
+test_audio('data/test_x_01.wav', 'test_s_01_recons.wav')
+test_audio('data/test_x_02.wav', 'test_s_02_recons.wav')
 
 #%%
-input_iter = iter(train_loader)
-target_iter = iter(test_loader)
-
-for i in range(s.shape[0]//BATCH):
-    print(i)
-    input_set = input_iter.next()
-    target_set = target_iter.next()
-    
-    input_set = input_set.cuda()
-    target_set = target_set.cuda()
-    optimizer.zero_grad()
-    network_output  = neural_network(input_set)
-    loss = loss_function(network_output , target_set)
-    loss.backward()
-    optimizer.step()
-    
-#%%
-st, sr=librosa.load('data/test_x_01.wav', sr=None)
-test_01 = librosa.stft(st, n_fft=1024, hop_length=512)
-test_01_abs = torch.tensor(np.abs(test_01))
-test_01_abs = np.transpose(test_01_abs)
-# test_01 = torch.tensor(test_01)
-t_loader = torch.utils.data.DataLoader(test_01_abs, batch_size=142)
-#%%  
-with torch.no_grad():
-    t_iter = iter(t_loader)
-    for i in range(test_01_abs.shape[0]//142):
-        data = t_iter.next()
-        data = data.cuda()
-        output = neural_network(data)
-        print(output.shape)
+test_audio('data/train_dirty_male.wav', 'train_dirty_male_recons.wav')
 
 
 #%%
-# speech_spectogram = get_hadamard_product_result(test_01, np.abs(test_01), output.numpy())
-spec = (test_01 / np.abs(test_01)) * output.cpu().numpy().T
-#%%
-
-#%%
-
-#%%
-spec_istft = librosa.istft(spec, length=512, win_length=1024)
-
-
-#%%
-librosa.output.write_wav('test_s_01_recons.wav', spec_istft, sr)
-
-#%%
-librosa.output.write_wav('test_s_01_recons.wav', spec_istft, sr)
